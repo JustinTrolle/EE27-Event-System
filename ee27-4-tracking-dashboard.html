@@ -332,14 +332,15 @@ function attendeesHTML(){
   let h=`<h3 class="sec">REGISTERED ATTENDEES</h3>
   <div style="margin-bottom:8px"><button class="btn" onclick="exportAttendees()">&#11015; EXPORT ATTENDEES CSV</button></div>`;
   if(!list.length)return h+`<div class="empty">No registrations yet.</div>`;
-  h+=`<div style="overflow-x:auto"><table class="rpt"><tr><th>NAME</th><th>ROLE</th><th>EMAIL</th><th class="num">PLANNED</th><th class="num">CHECKED IN</th><th>REGISTERED</th></tr>`;
+  h+=`<div style="overflow-x:auto"><table class="rpt"><tr><th>NAME</th><th>ROLE</th><th>EMAIL</th><th class="num">PLANNED</th><th class="num">CHECKED IN</th><th>REGISTERED</th><th></th></tr>`;
   const selBy={},chkBy={};
   (DATA.selections||[]).forEach(s=>{if(s.selected)selBy[s.attendee_id]=(selBy[s.attendee_id]||0)+1});
   (DATA.attendance||[]).forEach(t=>{chkBy[t.attendee_id]=(chkBy[t.attendee_id]||0)+1});
   for(const a of list){
     const rolesTxt=(a.roles&&a.roles.length)?`<div style="font-size:.66rem;color:var(--usat-gray-mid);margin-top:2px">${esc(a.roles.join(", "))}</div>`:"";
     h+=`<tr><td><b>${esc(a.name)}</b></td><td>${roleB(a.role)}${rolesTxt}</td><td>${esc(a.email||"")}</td>
-      <td class="num">${selBy[a.id]||""}</td><td class="num">${chkBy[a.id]||""}</td><td>${fmtT(a.created_at)}</td></tr>`;
+      <td class="num">${selBy[a.id]||""}</td><td class="num">${chkBy[a.id]||""}</td><td>${fmtT(a.created_at)}</td>
+      <td class="num"><button class="btn" style="background:#fff;color:var(--usat-red);border:1px solid var(--usat-red);padding:4px 9px;font-size:.6rem" onclick="removeAttendee('${a.id}')" title="Permanently remove this attendee and all their selections, check-ins, feedback, and survey response">✕ REMOVE</button></td></tr>`;
   }
   return h+"</table></div>";
 }
@@ -406,6 +407,16 @@ function exportEventSurvey(){
     for(const[id,label]of cols){const x=v.answers[id];row[label]=Array.isArray(x)?x.join("; "):(x||"");}
     return row;
   }));
+}
+async function removeAttendee(id){
+  const a=ATT[id]||{};
+  if(!confirm(`Permanently remove "${a.name||"this attendee"}"?\n\nThis also deletes ALL of their data: schedule selections, check-ins, session feedback, and their event survey response. This cannot be undone.`))return;
+  try{
+    const r=await fetch(SUPA_URL+"/rest/v1/rpc/ee27_delete_attendee",{method:"POST",headers:H,
+      body:JSON.stringify({p_pass:PASS,p_attendee:id})});
+    if(!r.ok){alert("Remove failed — check your connection and passcode.");return}
+    loadData(false);
+  }catch(e){alert("Remove failed — network problem.")}
 }
 // ---------- CSV export ----------
 function dlCSV(name,rows){
