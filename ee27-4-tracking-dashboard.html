@@ -289,25 +289,56 @@ function overviewHTML(){
   }
   return h+"</table></div>";
 }
+function fbCardHTML(f){
+  const a=ATT[f.attendee_id]||{};
+  return `<div class="fb-card">
+    <span class="who">${esc(a.name||"Unknown attendee")}</span> ${roleB(a.role)}
+    <div class="meta">${fmtT(f.submitted_at)}</div>
+    <div class="meta">Content: ${stars(f.content_rating)} &nbsp; Presenter: ${stars(f.presenter_rating)}</div>
+    ${f.comments?`<div class="cmt">${esc(f.comments)}</div>`:""}
+    ${f.wants_followup?`<span class="fu">&#9993; WANTS FOLLOW-UP${f.followup_email?": "+esc(f.followup_email):(a.email?": "+esc(a.email):"")}</span>`:""}
+  </div>`;
+}
 function feedbackHTML(){
   const opts=Object.values(ROWS).slice().sort((a,b)=>a.title<b.title?-1:1)
     .map(r=>`<option value="${esc(r.key)}" ${FBFILTER===r.key?"selected":""}>${esc(r.title)}</option>`).join("");
   let list=(DATA.feedback||[]);
   if(FBFILTER!=="__all__")list=list.filter(f=>f.session_key===FBFILTER);
-  let h=`<h3 class="sec">FEEDBACK &amp; COMMENTS</h3>
+  let h=`<h3 class="sec">FEEDBACK &amp; COMMENTS — GROUPED BY PRESENTATION</h3>
   <div class="ctrl"><select class="sel" onchange="FBFILTER=this.value;render()">
-    <option value="__all__" ${FBFILTER==="__all__"?"selected":""}>All sessions (newest first)</option>${opts}</select>
+    <option value="__all__" ${FBFILTER==="__all__"?"selected":""}>All sessions</option>${opts}</select>
     <button class="btn" onclick="exportFeedback()">&#11015; EXPORT FEEDBACK CSV</button></div>`;
   if(!list.length)return h+`<div class="empty">No feedback yet${FBFILTER!=="__all__"?" for this session":""}.</div>`;
-  for(const f of list){
-    const a=ATT[f.attendee_id]||{};
-    const r=ROWS[f.session_key];
-    h+=`<div class="fb-card">
-      <span class="who">${esc(a.name||"Unknown attendee")}</span> ${roleB(a.role)}
-      <div class="meta">${r?esc(r.title):esc(f.session_key)} • ${fmtT(f.submitted_at)}</div>
-      <div class="meta">Content: ${stars(f.content_rating)} &nbsp; Presenter: ${stars(f.presenter_rating)}</div>
-      ${f.comments?`<div class="cmt">${esc(f.comments)}</div>`:""}
-      ${f.wants_followup?`<span class="fu">&#9993; WANTS FOLLOW-UP${f.followup_email?": "+esc(f.followup_email):(a.email?": "+esc(a.email):"")}</span>`:""}
+  // group by session
+  const groups={};
+  for(const f of list)(groups[f.session_key]=groups[f.session_key]||[]).push(f);
+  // order groups by schedule position (day/time), unscheduled last, then title
+  const ord=key=>{const r=ROWS[key];if(r&&r.slot&&SLOTINFO[r.slot])return Number(SLOTINFO[r.slot].day)*100+SLOTINFO[r.slot].ord;return 9000};
+  const keys=Object.keys(groups).sort((a,b)=>{
+    const d=ord(a)-ord(b);if(d)return d;
+    const ta=(ROWS[a]||{title:a}).title,tb=(ROWS[b]||{title:b}).title;
+    return ta<tb?-1:1;
+  });
+  for(const key of keys){
+    const r=ROWS[key];
+    const fs=groups[key].slice().sort((x,y)=>x.submitted_at<y.submitted_at?1:-1);
+    let sumC=0,nC=0,sumP=0,nP=0,fu=0;
+    for(const f of fs){
+      if(f.content_rating){sumC+=f.content_rating;nC++;}
+      if(f.presenter_rating){sumP+=f.presenter_rating;nP++;}
+      if(f.wants_followup)fu++;
+    }
+    const slotBit=r&&r.slot?`<span class="slotpill">${esc(r.slot.toUpperCase())}</span> ${SLOTINFO[r.slot]?esc(DAYDATES[SLOTINFO[r.slot].day]+" • "+SLOTINFO[r.slot].time):""}`:`<span class="unsched">not scheduled</span>`;
+    h+=`<div style="background:var(--usat-blue);color:#fff;border-radius:4px 4px 0 0;padding:10px 14px;margin-top:18px">
+      <div style="font-family:var(--font-heading);font-size:.9rem;letter-spacing:.3px">${r?esc(r.title):esc(key)}</div>
+      <div style="font-size:.74rem;color:rgba(255,255,255,.85);margin-top:3px">${r?esc(r.speaker):""} &nbsp;•&nbsp; ${slotBit}</div>
+      <div style="font-size:.74rem;color:rgba(255,255,255,.85);margin-top:3px">${fs.length} response${fs.length===1?"":"s"}
+        ${nC?` &nbsp;•&nbsp; Content avg <b>${(sumC/nC).toFixed(2)}</b>`:""}
+        ${nP?` &nbsp;•&nbsp; Presenter avg <b>${(sumP/nP).toFixed(2)}</b>`:""}
+        ${fu?` &nbsp;•&nbsp; <b>${fu}</b> follow-up request${fu===1?"":"s"}`:""}</div>
+    </div>
+    <div style="border:1px solid var(--usat-gray-border);border-top:none;border-radius:0 0 4px 4px;padding:10px 12px 4px;background:#fafafa">
+      ${fs.map(fbCardHTML).join("")}
     </div>`;
   }
   return h;
