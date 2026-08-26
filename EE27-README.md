@@ -2,17 +2,19 @@
 
 Four self-contained HTML pages that share one live Supabase database.
 
-**Live site:** https://justintrolle.github.io/EE27-Event-System/
+**Live site:** https://enduranceexchange2027.com/
 
 | Page | Live URL |
 |---|---|
-| Participant Dashboard (share this one) | https://justintrolle.github.io/EE27-Event-System/ee27-3-participant-dashboard.html |
-| Session Intake (admin) | https://justintrolle.github.io/EE27-Event-System/ee27-1-session-intake.html |
-| Schedule Builder (admin) | https://justintrolle.github.io/EE27-Event-System/ee27-2-schedule-builder.html |
-| Tracking Dashboard (admin) | https://justintrolle.github.io/EE27-Event-System/ee27-4-tracking-dashboard.html |
+| Participant Dashboard (share this one) | https://enduranceexchange2027.com/ee27-3-participant-dashboard.html |
+| Session Intake (admin) | https://enduranceexchange2027.com/ee27-1-session-intake.html |
+| Schedule Builder (admin) | https://enduranceexchange2027.com/ee27-2-schedule-builder.html |
+| Tracking Dashboard (admin) | https://enduranceexchange2027.com/ee27-4-tracking-dashboard.html |
 
 The site root redirects to the Participant Dashboard, so the short link to give
-attendees is simply: **https://justintrolle.github.io/EE27-Event-System/**
+attendees is simply: **enduranceexchange2027.com**. The old
+justintrolle.github.io/EE27-Event-System/ links automatically redirect here.
+DNS lives at GoDaddy (A records on @ to GitHub Pages IPs, CNAME on www).
 
 **To publish changes:** edit the HTML files in this folder, then
 `git add -A && git commit -m "update" && git push` — GitHub Pages redeploys in ~1 minute.
