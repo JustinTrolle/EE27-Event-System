@@ -337,7 +337,8 @@ function attendeesHTML(){
   (DATA.selections||[]).forEach(s=>{if(s.selected)selBy[s.attendee_id]=(selBy[s.attendee_id]||0)+1});
   (DATA.attendance||[]).forEach(t=>{chkBy[t.attendee_id]=(chkBy[t.attendee_id]||0)+1});
   for(const a of list){
-    h+=`<tr><td><b>${esc(a.name)}</b></td><td>${roleB(a.role)}</td><td>${esc(a.email||"")}</td>
+    const rolesTxt=(a.roles&&a.roles.length)?`<div style="font-size:.66rem;color:var(--usat-gray-mid);margin-top:2px">${esc(a.roles.join(", "))}</div>`:"";
+    h+=`<tr><td><b>${esc(a.name)}</b></td><td>${roleB(a.role)}${rolesTxt}</td><td>${esc(a.email||"")}</td>
       <td class="num">${selBy[a.id]||""}</td><td class="num">${chkBy[a.id]||""}</td><td>${fmtT(a.created_at)}</td></tr>`;
   }
   return h+"</table></div>";
@@ -433,7 +434,7 @@ function exportFollowups(){
     return {name:a.name||"",role:a.role||"",email:f.followup_email||a.email||"",session:r?r.title:f.session_key,speaker:r?r.speaker:"",requested_at:f.submitted_at};}));
 }
 function exportAttendees(){
-  dlCSV("EE27_attendees.csv",(DATA.attendees||[]).map(a=>({name:a.name,role:a.role,email:a.email||"",registered_at:a.created_at})));
+  dlCSV("EE27_attendees.csv",(DATA.attendees||[]).map(a=>({name:a.name,role:a.role,roles:(a.roles||[]).join("; "),email:a.email||"",registered_at:a.created_at})));
 }
 // ---------- init ----------
 if(PASS){loadData(false).then(ok=>{if(ok)startAuto();});}

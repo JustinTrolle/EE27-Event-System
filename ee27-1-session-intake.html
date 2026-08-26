@@ -112,8 +112,16 @@ async function login(){
 }
 // ---------- main ----------
 async function loadExisting(){
-  const r=await fetch(SUPA_URL+"/rest/v1/ee27_sessions?select=key,title,speaker,sheet_sig,slot,day,source&order=title",{headers:H});
+  const r=await fetch(SUPA_URL+"/rest/v1/ee27_sessions?select=key,title,speaker,sheet_sig,slot,day,source,folder,fmt,track,summary,takeaways&order=title",{headers:H});
   EXISTING=r.ok?await r.json():[];
+}
+function byKey(key){return EXISTING.find(s=>s.key===key)}
+async function saveSession(key,patch){
+  try{
+    const r=await fetch(SUPA_URL+"/rest/v1/rpc/ee27_save_session",{method:"POST",headers:H,body:JSON.stringify({p_pass:PASS,p_key:key,p_patch:patch})});
+    if(!r.ok){alert("Save failed — check your connection and passcode.");return false}
+    return true;
+  }catch(e){alert("Save failed — network problem.");return false}
 }
 async function start(){
   await loadExisting();
@@ -138,14 +146,14 @@ function render(){
     <textarea id="pastebox" placeholder="…or paste raw CSV text here"></textarea>
     <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn ghost" onclick="parsePaste()">PARSE PASTED TEXT</button>
-      <button class="btn ghost" onclick="tryLiveFetch()" title="Only works if the sheet is shared as 'Anyone with the link'">⟳ TRY LIVE FETCH FROM GOOGLE</button>
       <span class="stamp" id="parse-status"></span>
     </div>
   </div>
   <div id="preview"></div>
-  <h3 class="sec">CURRENT DATABASE <span class="stamp">(${EXISTING.length} sessions)</span></h3>
-  <div style="overflow-x:auto"><table class="rpt"><tr><th>SESSION</th><th>SPEAKER</th><th>DAY</th><th>SLOT</th></tr>
-  ${EXISTING.map(s=>`<tr><td><b>${esc(s.title)}</b></td><td>${esc(s.speaker)}</td><td>${esc(s.day||"—")}</td><td>${esc((s.slot||"—").toUpperCase())}</td></tr>`).join("")}
+  <h3 class="sec">CURRENT DATABASE <span class="stamp">(${EXISTING.length} sessions · ${EXISTING.filter(s=>s.folder).length} with presenter folders)</span></h3>
+  <div class="hint">Click a session title to see its summary and key takeaways. Track and Format save instantly when changed. Uploading a new CSV only ADDS new submissions — nothing you set here (track, format, folder, day, slot) is ever overwritten by an import.</div>
+  <div style="overflow-x:auto"><table class="rpt"><tr><th>SESSION</th><th>SPEAKER</th><th>TRACK</th><th>FORMAT</th><th>DAY</th><th>SLOT</th><th>PRESENTER FOLDER</th></tr>
+  ${EXISTING.map(dbRowHTML).join("")}
   </table></div>`;
   m.innerHTML=html;
   const d=document.getElementById("drop");
@@ -153,6 +161,53 @@ function render(){
   d.addEventListener("dragleave",()=>d.classList.remove("on"));
   d.addEventListener("drop",e=>{e.preventDefault();d.classList.remove("on");if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0])});
   if(PLAN)showPreview();
+}
+// ---------- current database table ----------
+const TRACKS=[["coach","Coach"],["rd","Race Director"],["industry","Industry Expert"]];
+const FORMATS=["Presentation","Keynote","Panel Discussion","Workshop / Hands-On","Breakout Session"];
+const OPEN_ROWS=new Set();
+function dbRowHTML(s){
+  const fmtOpts=(FORMATS.includes(s.fmt)?FORMATS:[s.fmt||"—",...FORMATS]);
+  const takeaways=Array.isArray(s.takeaways)?s.takeaways:[];
+  let h=`<tr>
+    <td><b style="cursor:pointer;color:var(--usat-blue)" onclick="toggleRow('${esc(s.key)}')" title="Show summary and key takeaways">${OPEN_ROWS.has(s.key)?"▾":"▸"} ${esc(s.title)}</b></td>
+    <td>${esc(s.speaker)}</td>
+    <td><select onchange="setField('${esc(s.key)}','track',this.value)" style="font-size:.74rem;padding:3px;border:1px solid var(--usat-gray-border);border-radius:3px">
+      ${TRACKS.map(([v,l])=>`<option value="${v}" ${s.track===v?"selected":""}>${l}</option>`).join("")}</select></td>
+    <td><select onchange="setField('${esc(s.key)}','fmt',this.value)" style="font-size:.74rem;padding:3px;border:1px solid var(--usat-gray-border);border-radius:3px;max-width:170px">
+      ${fmtOpts.map(o=>`<option ${s.fmt===o?"selected":""}>${esc(o)}</option>`).join("")}</select></td>
+    <td>${esc(s.day||"—")}</td>
+    <td>${esc((s.slot||"—").toUpperCase())}</td>
+    <td>${s.folder
+      ?`<a href="${esc(s.folder)}" target="_blank" rel="noopener" style="color:#1B6E3C;font-weight:bold;font-size:.74rem">🔗 OPEN</a>
+        <button class="btn ghost" style="padding:3px 8px;font-size:.6rem;margin-left:6px" onclick="editFolder('${esc(s.key)}')">✎ EDIT</button>`
+      :`<button class="btn" style="padding:4px 9px;font-size:.6rem" onclick="editFolder('${esc(s.key)}')">＋ ADD LINK</button>`}</td>
+  </tr>`;
+  if(OPEN_ROWS.has(s.key)){
+    h+=`<tr><td colspan="7" style="background:#F8FAFC;padding:12px 16px">
+      ${s.summary?`<div style="font-family:var(--font-heading);font-size:.68rem;color:var(--usat-red);letter-spacing:.5px;margin-bottom:4px">SUMMARY</div><p style="font-size:.8rem;line-height:1.5;margin-bottom:10px">${esc(s.summary)}</p>`:""}
+      ${takeaways.length?`<div style="font-family:var(--font-heading);font-size:.68rem;color:var(--usat-red);letter-spacing:.5px;margin-bottom:4px">KEY TAKEAWAYS</div><ul style="font-size:.8rem;line-height:1.5;padding-left:18px">${takeaways.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}
+      ${!s.summary&&!takeaways.length?`<span class="stamp">No summary or takeaways on file for this session.</span>`:""}
+    </td></tr>`;
+  }
+  return h;
+}
+function toggleRow(key){
+  if(OPEN_ROWS.has(key))OPEN_ROWS.delete(key);else OPEN_ROWS.add(key);
+  render();
+}
+async function setField(key,field,val){
+  const s=byKey(key);if(!s)return;
+  const old=s[field];s[field]=val;
+  if(!await saveSession(key,{[field]:val})){s[field]=old;render();}
+}
+async function editFolder(key){
+  const s=byKey(key);if(!s)return;
+  const url=prompt(`Google Drive folder link for:\n"${s.title}" — ${s.speaker}\n\nPaste the folder URL (leave empty to remove the link):`,s.folder||"");
+  if(url===null)return;
+  const trimmed=url.trim();
+  if(trimmed&&!/^https?:\/\//i.test(trimmed)){alert("That doesn't look like a link — it should start with https://");return}
+  if(await saveSession(key,{folder:trimmed})){s.folder=trimmed||null;render();}
 }
 function readFile(f){
   const rd=new FileReader();
@@ -163,15 +218,6 @@ function parsePaste(){
   const t=document.getElementById("pastebox").value.trim();
   if(!t){setStatus("Nothing pasted yet.",false);return}
   handleCSV(t);
-}
-async function tryLiveFetch(){
-  setStatus("Fetching from Google…",true);
-  try{
-    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`);
-    const t=await r.text();
-    if(!r.ok||t.trim().startsWith("<")){setStatus("Google blocked the fetch — the sheet isn't public. Use the CSV download instead.",false);return}
-    handleCSV(t);
-  }catch(e){setStatus("Live fetch failed (sheet not public or network issue). Use the CSV download instead.",false)}
 }
 function setStatus(msg,ok){const el=document.getElementById("parse-status");el.textContent=msg;el.className=ok?"ok":"err"}
 // ---------- CSV parsing ----------

@@ -46,9 +46,11 @@ Stage 4: real-time rollup — planned vs checked-in vs scores, feedback wall,
 
 ## Stage 1 — Session Intake
 - Source sheet: [EE27 presenter submissions](https://docs.google.com/spreadsheets/d/1gFTyB-rV0xvlsaoJ_6WKOGuEXrmEArtinOt9_KXpriw/edit)
-- The sheet is private, so the normal flow is **File → Download → CSV**, then drop the
-  file on the intake page. (The "Try live fetch" button works only if the sheet is ever
-  shared as *Anyone with the link*.)
+- The sheet is private, so the flow is **File → Download → CSV**, then drop the file on
+  the intake page (or paste the CSV text).
+- The Current Database table shows every session with editable Track and Format
+  dropdowns, a presenter-folder column (add/edit/open links in place), and click-to-expand
+  summaries and key takeaways.
 - Re-importing is always safe: rows are matched to existing sessions (by a stored sheet
   signature, then title, then speaker+title similarity). Matched rows only update
   contact info/bio; your curated titles, summaries, day themes, and slot assignments are

@@ -170,6 +170,7 @@ const SURVEY=[
  {id:"week",t:"single",q:"Do you prefer the conference to take place during the week or over the weekend?",opts:["During the week","Over the weekend","No preference"]},
  {id:"future",t:"single",q:"Do you plan to attend Endurance Exchange in future years? Please select the appropriate percentage.",opts:["100% - Yes, I will be there","80% - Extremely likely that I will be there","60% - Somewhat likely that I will be there","50% - On the fence about attending","25% - Unlikely that I will be there","0% - No, I will not be there"]}
 ];
+const ROLE_OPTS=["Coach","Race Director","Athlete","Club","Foundation Member","USA Triathlon Partner","Industry Specialist","Other"];
 let SVSTATE=null; // {open, opens_at}
 let SVSAVED={};try{SVSAVED=JSON.parse(localStorage.getItem("ee27_eventsurvey")||"{}")}catch(e){}
 let ME=null;try{ME=JSON.parse(localStorage.getItem("ee27_attendee")||"null")}catch(e){}
@@ -184,12 +185,10 @@ function gateHTML(msg){
     <p>Register once on this device to build your personal schedule, check in to sessions, and share feedback.</p>
     <label>Full name</label><input id="r-name" placeholder="Your name">
     <label>Email</label><input id="r-email" type="email" placeholder="you@example.com">
-    <label>I am a…</label>
-    <select id="r-role">
-      <option value="coach">Coach</option>
-      <option value="race_director">Race Director</option>
-      <option value="other">Other / Industry</option>
-    </select>
+    <label>I am a… (choose all that apply)</label>
+    <div style="text-align:left;background:#fff;border:1px solid var(--usat-gray-border);border-radius:3px;padding:8px 10px">
+      ${ROLE_OPTS.map(r=>`<label class="sv-opt" style="padding:3px 0"><input type="checkbox" name="r-role" value="${esc(r)}"> ${esc(r)}</label>`).join("")}
+    </div>
     <div class="err">${esc(msg||"")}</div>
     <div style="text-align:center;margin-top:8px"><button class="btn" onclick="register()">START BUILDING MY SCHEDULE</button></div>
   </div>`;
@@ -197,18 +196,25 @@ function gateHTML(msg){
 async function register(){
   const name=document.getElementById("r-name").value.trim();
   const email=document.getElementById("r-email").value.trim();
-  const role=document.getElementById("r-role").value;
+  const roles=[...document.querySelectorAll('input[name="r-role"]:checked')].map(c=>c.value);
   if(!name){document.getElementById("main").innerHTML=gateHTML("Please enter your name.");return}
+  if(!roles.length){document.getElementById("main").innerHTML=gateHTML("Please pick at least one role.");keepReg(name,email);return}
+  // primary role keeps the coach/RD rollup on the tracking dashboard working
+  const role=roles.includes("Coach")?"coach":roles.includes("Race Director")?"race_director":"other";
   try{
     const id=(crypto.randomUUID?crypto.randomUUID():([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
     const r=await fetch(SUPA_URL+"/rest/v1/ee27_attendees",{method:"POST",
       headers:{...H,"Prefer":"return=minimal"},
-      body:JSON.stringify({id,name,email,role})});
-    if(!r.ok){document.getElementById("main").innerHTML=gateHTML("Registration failed — please try again.");return}
-    ME={id,name,email,role};
+      body:JSON.stringify({id,name,email,role,roles})});
+    if(!r.ok){document.getElementById("main").innerHTML=gateHTML("Registration failed — please try again.");keepReg(name,email);return}
+    ME={id,name,email,role,roles};
     localStorage.setItem("ee27_attendee",JSON.stringify(ME));
     await loadAll();render();
   }catch(e){document.getElementById("main").innerHTML=gateHTML("Connection problem — please try again.")}
+}
+function keepReg(name,email){
+  const n=document.getElementById("r-name"),e=document.getElementById("r-email");
+  if(n)n.value=name;if(e)e.value=email;
 }
 function signout(){
   if(!confirm("Reset this device? Your selections stay saved, but you'll register again with a fresh profile."))return;
@@ -255,7 +261,13 @@ async function toggleSel(key){
   }
 }
 async function checkIn(key){
-  if(CHK.has(key))return;
+  if(CHK.has(key)){
+    if(!confirm("Undo this check-in? Only do this if you checked in by accident."))return;
+    CHK.delete(key);CHKCOUNTS[key]=Math.max(0,(CHKCOUNTS[key]||1)-1);render();
+    await fetch(`${SUPA_URL}/rest/v1/ee27_attendance?attendee_id=eq.${ME.id}&session_key=eq.${encodeURIComponent(key)}`,{method:"DELETE",headers:H});
+    toast("Check-in removed");
+    return;
+  }
   CHK.add(key);CHKCOUNTS[key]=(CHKCOUNTS[key]||0)+1;render();
   await fetch(`${SUPA_URL}/rest/v1/ee27_attendance?on_conflict=attendee_id,session_key`,{method:"POST",
     headers:{...H,"Prefer":"resolution=ignore-duplicates"},
@@ -311,7 +323,7 @@ function cardHTML(s,room,isKey){
     </div>
     <div class="actions">
       <button class="act ${sel?"on":""}" onclick="toggleSel('${esc(s.key)}')">${sel?"✓ ON MY SCHEDULE":"☆ ADD TO MY SCHEDULE"}</button>
-      <button class="act green ${chk?"on":""}" onclick="checkIn('${esc(s.key)}')">${chk?"✓ CHECKED IN":"CHECK IN"}</button>
+      <button class="act green ${chk?"on":""}" onclick="checkIn('${esc(s.key)}')" title="${chk?"Tap again to undo an accidental check-in":"Record that you attended this session"}">${chk?"✓ CHECKED IN":"CHECK IN"}</button>
       <button class="act red" onclick="toggleFb('${esc(s.key)}',event)">${done?"✎ EDIT FEEDBACK":"★ GIVE FEEDBACK"}</button>
     </div>
     <div class="fbform" onclick="event.stopPropagation()">
@@ -460,19 +472,27 @@ async function submitSurvey(){
 function render(){
   const snap=snapshotForms();
   const who=document.getElementById("who");
-  who.innerHTML=ME?`<b>${esc(ME.name)}</b>${esc(ME.role==="coach"?"Coach":ME.role==="race_director"?"Race Director":"Attendee")} · <a onclick="signout()">reset</a>`:"";
+  who.innerHTML=ME?`<b>${esc(ME.name)}</b>${esc((ME.roles&&ME.roles.length)?ME.roles.join(", "):(ME.role==="coach"?"Coach":ME.role==="race_director"?"Race Director":"Attendee"))} · <a onclick="signout()">reset</a>`:"";
   const m=document.getElementById("main");
   if(!ME){m.innerHTML=gateHTML("");return}
   const nMine=SESSIONS.filter(s=>SEL.has(s.key)).length;
-  let h=`<div class="tabs">
-    ${["1","2","3"].map(d=>`<button class="tab ${TAB===d?"on":""}" onclick="TAB='${d}';render()">DAY ${d} · ${esc(DAY_META[d].date.split(",")[0]).toUpperCase()}</button>`).join("")}
-    <button class="tab ${TAB==="my"?"on":""}" onclick="TAB='my';render()">MY SCHEDULE<span class="n">${nMine}</span></button>
-    <button class="tab ${TAB==="survey"?"on":""}" onclick="TAB='survey';render()">${surveyOpen()?"📋":"🔒"} EVENT SURVEY</button>
-  </div>
-  ${TAB==="survey"?"":`<div class="note">Tap a session title for the full summary and takeaways. “Add to my schedule” tells us what you're interested in; “Check in” records that you attended; feedback goes straight to the education team.</div>`}`;
+  const tabsHTML=(where)=>`<div class="tabs">
+    ${["1","2","3"].map(d=>`<button class="tab ${TAB===d?"on":""}" onclick="goTab('${d}','${where}')">DAY ${d} · ${esc(DAY_META[d].date.split(",")[0]).toUpperCase()}</button>`).join("")}
+    <button class="tab ${TAB==="my"?"on":""}" onclick="goTab('my','${where}')">MY SCHEDULE<span class="n">${nMine}</span></button>
+    <button class="tab ${TAB==="survey"?"on":""}" onclick="goTab('survey','${where}')">${surveyOpen()?"📋":"🔒"} EVENT SURVEY</button>
+  </div>`;
+  let h=tabsHTML("top");
+  h+=TAB==="survey"?"":`<div class="note">Tap a session title for the full summary and takeaways. “Add to my schedule” tells us what you're interested in; “Check in” records that you attended; feedback goes straight to the education team.</div>`;
   h+=TAB==="survey"?surveyHTML():TAB==="my"?myHTML():dayHTML(TAB);
+  h+=`<div style="border-top:1px solid var(--usat-gray-border);margin-top:22px;padding-top:14px">
+    <div style="font-size:.7rem;font-weight:bold;letter-spacing:.5px;color:var(--usat-gray-mid);text-transform:uppercase;margin-bottom:8px">Jump to another day</div>
+    ${tabsHTML("bottom")}</div>`;
   m.innerHTML=h;
   restoreForms(snap);
+}
+function goTab(t,where){
+  TAB=t;render();
+  if(where==="bottom")window.scrollTo({top:0,behavior:"instant"});
 }
 // ---------- init ----------
 (async()=>{
