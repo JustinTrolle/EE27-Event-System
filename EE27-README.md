@@ -1,7 +1,21 @@
 # Endurance Exchange 2027 — 4-Stage Event System
 
-Four self-contained HTML pages that share one live Supabase database. Deploy all four
-files to GitHub Pages (or open them locally) — no build step required.
+Four self-contained HTML pages that share one live Supabase database.
+
+**Live site:** https://justintrolle.github.io/EE27-Event-System/
+
+| Page | Live URL |
+|---|---|
+| Participant Dashboard (share this one) | https://justintrolle.github.io/EE27-Event-System/ee27-3-participant-dashboard.html |
+| Session Intake (admin) | https://justintrolle.github.io/EE27-Event-System/ee27-1-session-intake.html |
+| Schedule Builder (admin) | https://justintrolle.github.io/EE27-Event-System/ee27-2-schedule-builder.html |
+| Tracking Dashboard (admin) | https://justintrolle.github.io/EE27-Event-System/ee27-4-tracking-dashboard.html |
+
+The site root redirects to the Participant Dashboard, so the short link to give
+attendees is simply: **https://justintrolle.github.io/EE27-Event-System/**
+
+**To publish changes:** edit the HTML files in this folder, then
+`git add -A && git commit -m "update" && git push` — GitHub Pages redeploys in ~1 minute.
 
 | Stage | File | Who uses it | Access |
 |---|---|---|---|
