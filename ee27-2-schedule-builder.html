@@ -73,6 +73,26 @@ td.keynote .card .sp-link:hover{color:#FFD3DD;text-decoration-color:#FFD3DD}
 .folder-btn{background:var(--usat-blue);margin-left:8px}
 .folder-btn:hover{background:var(--usat-blue-dark)}
 td.keynote .folder-btn{background:rgba(255,255,255,.18)}
+.signups{display:inline-block;margin-top:6px;font-size:.7rem;font-weight:bold;color:var(--usat-blue);background:var(--usat-blue-tint);border:1px solid var(--usat-gray-border);border-radius:10px;padding:2px 9px;cursor:pointer}
+.signups:hover{background:var(--usat-blue);color:#fff}
+.signups.zero{opacity:.55}
+td.keynote .signups{background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.4)}
+td.keynote .signups:hover{background:#fff;color:var(--usat-blue-dark)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,31,71,.55);z-index:90;display:flex;align-items:center;justify-content:center;padding:18px}
+.modal{background:#fff;border-radius:6px;max-width:640px;width:100%;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35)}
+.modal .mh{background:var(--usat-blue);color:#fff;border-radius:6px 6px 0 0;padding:14px 18px}
+.modal .mh h3{font-family:var(--font-heading);font-size:.95rem;letter-spacing:.3px;line-height:1.3}
+.modal .mh .sub{font-size:.75rem;color:rgba(255,255,255,.85);margin-top:3px}
+.modal .mb{padding:14px 18px;overflow-y:auto}
+.modal table{border-collapse:collapse;width:100%;font-size:.8rem}
+.modal th{background:var(--usat-blue-tint);color:var(--usat-blue);font-family:var(--font-heading);font-weight:normal;font-size:.64rem;letter-spacing:.4px;padding:7px 8px;text-align:left;border:1px solid var(--usat-gray-border)}
+.modal td{border:1px solid var(--usat-gray-border);padding:6px 8px}
+.modal .mf{padding:12px 18px;border-top:1px solid var(--usat-gray-border);display:flex;gap:10px;justify-content:flex-end}
+.modal .mf button{font-family:var(--font-heading);font-size:.7rem;letter-spacing:.5px;padding:8px 14px;border-radius:4px;border:none;cursor:pointer}
+.modal .m-csv{background:var(--usat-red);color:#fff}
+.modal .m-csv:hover{background:#8a0a2b}
+.modal .m-close{background:#fff;color:var(--usat-blue);border:1px solid var(--usat-blue) !important}
+.modal .empty{font-size:.82rem;color:var(--usat-gray-mid);font-style:italic;padding:10px 0}
 .pool{border:1px solid var(--usat-gray-border);border-top:none;background:#fafafa;padding:16px}
 .pool h3{font-family:var(--font-heading);color:var(--usat-blue);font-size:.95rem;margin-bottom:4px}
 .pool .hint{font-size:.78rem;color:var(--usat-gray-mid);margin-bottom:12px}
@@ -119,7 +139,7 @@ footer{background:var(--usat-blue-dark);color:rgba(255,255,255,.75);text-align:c
 .sync-status.sync-ok{color:#1B6E3C}
 .sync-status.sync-off{color:var(--usat-red)}
 @media print{
-  .dl-btn,.toolbar,.assign-count,.sync-status,.legend,.pool,.card-foot,.acc-toggle,.stagebar{display:none !important}
+  .dl-btn,.toolbar,.assign-count,.sync-status,.legend,.pool,.card-foot,.acc-toggle,.stagebar,.signups,.modal-bg{display:none !important}
   .day-block{page-break-after:always}
   header{padding:12px 20px}
   header .logo{height:50px}
@@ -191,11 +211,19 @@ async function login(){
   }catch(e){ document.getElementById("app").innerHTML = gateHTML("Connection problem — try again."); }
 }
 // ---------- data ----------
+let COUNTS = {};
 async function loadSessions(){
   try{
-    const r = await fetch(SUPA_URL+"/rest/v1/ee27_sessions?select=key,title,speaker,org,fmt,track,day,slot,summary,takeaways,notes,folder,status&order=title",{headers:H});
+    const [r, rs] = await Promise.all([
+      fetch(SUPA_URL+"/rest/v1/ee27_sessions?select=key,title,speaker,org,fmt,track,day,slot,summary,takeaways,notes,folder,status&order=title",{headers:H}),
+      fetch(SUPA_URL+"/rest/v1/ee27_selections?select=session_key,selected",{headers:H})
+    ]);
     if(!r.ok){ setSyncStatus("Sync error — could not load sessions", false); return; }
     SESSIONS = await r.json();
+    if(rs.ok){
+      COUNTS = {};
+      (await rs.json()).forEach(s=>{ if(s.selected) COUNTS[s.session_key]=(COUNTS[s.session_key]||0)+1; });
+    }
     setSyncStatus("Live sync on — updated " + new Date().toLocaleTimeString(), true);
   }catch(e){ setSyncStatus("Offline — could not load sessions", false); }
 }
@@ -222,6 +250,7 @@ function cardHTML(s, showSlot){
     <div class="title" onclick="toggle('${esc(s.key)}')">${esc(s.title)}</div>
     <div class="speaker"><b>${s.folder?`<a class="sp-link" href="${s.folder}" target="_blank" rel="noopener" title="Open ${esc(s.speaker)}'s presenter folder in Google Drive" onclick="event.stopPropagation()">${esc(s.speaker)}</a>`:esc(s.speaker)}</b>${s.org?" · "+esc(s.org):""}</div>
     <span class="fmt">${esc(s.fmt)}</span><br>
+    <span class="signups ${COUNTS[s.key]?"":"zero"}" onclick="showSignups('${esc(s.key)}')" title="Click to see who signed up and export the list">👥 ${COUNTS[s.key]||0} signed up</span><br>
     <span class="acc-toggle" onclick="toggle('${esc(s.key)}')">Details</span>
     <div class="acc-body">
       <h5>Summary</h5><p>${esc(s.summary)}</p>
@@ -361,6 +390,69 @@ function build(openKeys){
   openKeys.forEach(k=>{ const el=document.querySelector(`.card[data-key="${CSS.escape(k)}"]`); if(el) el.classList.add("open"); });
   const n = SESSIONS.filter(s=>s.slot).length;
   document.getElementById("assign-count").textContent = n + " of 62 slots assigned (56 sessions + 6 keynotes)  •  " + (SESSIONS.length-n) + " of " + SESSIONS.length + " sessions unassigned  •  shared live with everyone viewing this page";
+}
+// ---------- signup roster ----------
+let ADMIN_CACHE = null, ADMIN_CACHE_AT = 0;
+async function adminData(){
+  if(ADMIN_CACHE && Date.now()-ADMIN_CACHE_AT < 30000) return ADMIN_CACHE;
+  const r = await fetch(SUPA_URL+"/rest/v1/rpc/ee27_admin_data",{method:"POST",headers:H,body:JSON.stringify({p_pass:PASS})});
+  if(!r.ok) throw new Error("admin data failed");
+  ADMIN_CACHE = await r.json(); ADMIN_CACHE_AT = Date.now();
+  return ADMIN_CACHE;
+}
+function roleLabel(a){
+  if(a.roles && a.roles.length) return a.roles.join(", ");
+  return a.role==="coach"?"Coach":a.role==="race_director"?"Race Director":"Other";
+}
+async function showSignups(key){
+  const s = byKey(key); if(!s) return;
+  let d;
+  try{ d = await adminData(); }
+  catch(e){ alert("Could not load the signup list — check your connection."); return; }
+  const att = {}; (d.attendees||[]).forEach(a=>att[a.id]=a);
+  const chk = new Set((d.attendance||[]).filter(t=>t.session_key===key).map(t=>t.attendee_id));
+  const list = (d.selections||[]).filter(x=>x.selected && x.session_key===key)
+    .map(x=>att[x.attendee_id]).filter(Boolean)
+    .sort((a,b)=>a.name.toLowerCase()<b.name.toLowerCase()?-1:1);
+  const slotBit = s.slot ? s.slot.toUpperCase() : "not scheduled";
+  let rows = list.length
+    ? `<table><tr><th>NAME</th><th>ROLE(S)</th><th>EMAIL</th><th>CHECKED IN</th></tr>
+       ${list.map(a=>`<tr><td><b>${esc(a.name)}</b></td><td>${esc(roleLabel(a))}</td><td>${esc(a.email||"")}</td><td>${chk.has(a.id)?"✓":""}</td></tr>`).join("")}</table>`
+    : `<div class="empty">No one has added this session to their schedule yet.</div>`;
+  const bg = document.createElement("div");
+  bg.className = "modal-bg";
+  bg.onclick = e=>{ if(e.target===bg) bg.remove(); };
+  bg.innerHTML = `<div class="modal">
+    <div class="mh"><h3>${esc(s.title)}</h3>
+      <div class="sub">${esc(s.speaker)} &nbsp;•&nbsp; ${esc(slotBit)} &nbsp;•&nbsp; ${list.length} signed up</div></div>
+    <div class="mb">${rows}</div>
+    <div class="mf">
+      ${list.length?`<button class="m-csv" onclick='exportSignups(${JSON.stringify(key)})'>⬇ DOWNLOAD SIGNUP CSV</button>`:""}
+      <button class="m-close" onclick="this.closest('.modal-bg').remove()">CLOSE</button>
+    </div>
+  </div>`;
+  document.body.appendChild(bg);
+}
+async function exportSignups(key){
+  const s = byKey(key); if(!s) return;
+  const d = await adminData();
+  const att = {}; (d.attendees||[]).forEach(a=>att[a.id]=a);
+  const chk = new Set((d.attendance||[]).filter(t=>t.session_key===key).map(t=>t.attendee_id));
+  const list = (d.selections||[]).filter(x=>x.selected && x.session_key===key)
+    .map(x=>att[x.attendee_id]).filter(Boolean)
+    .sort((a,b)=>a.name.toLowerCase()<b.name.toLowerCase()?-1:1);
+  if(!list.length){ alert("No signups to export yet."); return; }
+  const rows = list.map(a=>({
+    session: s.title, slot: s.slot?s.slot.toUpperCase():"", speaker: s.speaker,
+    name: a.name, roles: roleLabel(a), email: a.email||"", checked_in: chk.has(a.id)?"yes":"no"
+  }));
+  const cols = Object.keys(rows[0]);
+  const q = v=>{ v = v==null?"":String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const csv = cols.join(",")+"\n"+rows.map(r=>cols.map(c=>q(r[c])).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}));
+  a.download = (s.slot?s.slot.toUpperCase()+"_":"") + s.title.replace(/[^a-z0-9]+/gi,"_").slice(0,50) + "_signups.csv";
+  a.click(); URL.revokeObjectURL(a.href);
 }
 // ---------- PDF ----------
 function downloadPDF(key){
