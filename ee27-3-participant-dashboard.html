@@ -111,6 +111,21 @@ header .who a{color:#FFD3DD;cursor:pointer;text-decoration:underline}
 .sv-done{font-size:.8rem;color:#1B6E3C;font-weight:bold;text-align:center;margin-top:8px}
 .toast.show{opacity:1}
 footer{background:var(--usat-blue-dark);color:rgba(255,255,255,.75);text-align:center;font-size:.72rem;padding:14px}
+.tab.print-tab{border-color:var(--usat-red);color:var(--usat-red)}
+.tab.print-tab:hover{background:var(--usat-red);color:#fff}
+@media print{
+  .tabs,.note,.actions,.fbform,.acc-toggle,.toast,footer,header .who,.pop,.bottom-jump{display:none !important}
+  header{padding:10px 16px}
+  header .logo{height:40px}
+  body{font-size:12px}
+  .timeblock,.band{break-inside:avoid}
+  .tb-body{background:#fff}
+  .card.key{background:#fff;color:var(--usat-gray-dark);border:2px solid var(--usat-blue-dark)}
+  .card.key .title{color:var(--usat-blue)}
+  .card.key .speaker,.card.key .room{color:var(--usat-gray-mid)}
+  .card.key .speaker b{color:var(--usat-gray-dark)}
+  @page{size:letter;margin:12mm}
+}
 </style>
 </head>
 <body>
@@ -482,11 +497,12 @@ function render(){
     ${["1","2","3"].map(d=>`<button class="tab ${TAB===d?"on":""}" onclick="goTab('${d}','${where}')">DAY ${d} · ${esc(DAY_META[d].date.split(",")[0]).toUpperCase()}</button>`).join("")}
     <button class="tab ${TAB==="my"?"on":""}" onclick="goTab('my','${where}')">MY SCHEDULE<span class="n">${nMine}</span></button>
     <button class="tab ${TAB==="survey"?"on":""}" onclick="goTab('survey','${where}')">${surveyOpen()?"📋":"🔒"} EVENT SURVEY</button>
+    ${TAB==="survey"?"":`<button class="tab print-tab" onclick="window.print()" title="Print the schedule you're currently viewing">🖨 PRINT SCHEDULE</button>`}
   </div>`;
   let h=tabsHTML("top");
   h+=TAB==="survey"?"":`<div class="note">Tap a session title for the full summary and takeaways. “Add to my schedule” tells us what you're interested in; “Check in” records that you attended; feedback goes straight to the education team.</div>`;
   h+=TAB==="survey"?surveyHTML():TAB==="my"?myHTML():dayHTML(TAB);
-  h+=`<div style="border-top:1px solid var(--usat-gray-border);margin-top:22px;padding-top:14px">
+  h+=`<div class="bottom-jump" style="border-top:1px solid var(--usat-gray-border);margin-top:22px;padding-top:14px">
     <div style="font-size:.7rem;font-weight:bold;letter-spacing:.5px;color:var(--usat-gray-mid);text-transform:uppercase;margin-bottom:8px">Jump to another day</div>
     ${tabsHTML("bottom")}</div>`;
   m.innerHTML=h;

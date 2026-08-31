@@ -73,6 +73,10 @@ td.keynote .card .sp-link:hover{color:#FFD3DD;text-decoration-color:#FFD3DD}
 .folder-btn{background:var(--usat-blue);margin-left:8px}
 .folder-btn:hover{background:var(--usat-blue-dark)}
 td.keynote .folder-btn{background:rgba(255,255,255,.18)}
+.cstat{display:inline-block;margin-top:6px;margin-right:4px;font-size:.64rem;font-weight:bold;letter-spacing:.3px;color:var(--usat-gray-mid);background:#fff;border:1px solid var(--usat-gray-border);border-radius:3px;padding:1px 6px}
+.cstat.on{color:#fff;background:#1B6E3C;border-color:#1B6E3C}
+td.keynote .cstat{background:rgba(255,255,255,.12);color:rgba(255,255,255,.75);border-color:rgba(255,255,255,.4)}
+td.keynote .cstat.on{background:#1B6E3C;color:#fff;border-color:#1B6E3C}
 .signups{display:inline-block;margin-top:6px;font-size:.7rem;font-weight:bold;color:var(--usat-blue);background:var(--usat-blue-tint);border:1px solid var(--usat-gray-border);border-radius:10px;padding:2px 9px;cursor:pointer}
 .signups:hover{background:var(--usat-blue);color:#fff}
 .signups.zero{opacity:.55}
@@ -139,7 +143,7 @@ footer{background:var(--usat-blue-dark);color:rgba(255,255,255,.75);text-align:c
 .sync-status.sync-ok{color:#1B6E3C}
 .sync-status.sync-off{color:var(--usat-red)}
 @media print{
-  .dl-btn,.toolbar,.assign-count,.sync-status,.legend,.pool,.card-foot,.acc-toggle,.stagebar,.signups,.modal-bg{display:none !important}
+  .dl-btn,.toolbar,.assign-count,.sync-status,.legend,.pool,.card-foot,.acc-toggle,.stagebar,.signups,.modal-bg,.cstat{display:none !important}
   .day-block{page-break-after:always}
   header{padding:12px 20px}
   header .logo{height:50px}
@@ -215,7 +219,7 @@ let COUNTS = {};
 async function loadSessions(){
   try{
     const [r, rs] = await Promise.all([
-      fetch(SUPA_URL+"/rest/v1/ee27_sessions?select=key,title,speaker,org,fmt,track,day,slot,summary,takeaways,notes,folder,status&order=title",{headers:H}),
+      fetch(SUPA_URL+"/rest/v1/ee27_sessions?select=key,title,speaker,org,fmt,track,day,slot,summary,takeaways,notes,folder,status,contract_sent,contract_signed&order=title",{headers:H}),
       fetch(SUPA_URL+"/rest/v1/ee27_selections?select=session_key,selected",{headers:H})
     ]);
     if(!r.ok){ setSyncStatus("Sync error — could not load sessions", false); return; }
@@ -250,6 +254,8 @@ function cardHTML(s, showSlot){
     <div class="title" onclick="toggle('${esc(s.key)}')">${esc(s.title)}</div>
     <div class="speaker"><b>${s.folder?`<a class="sp-link" href="${s.folder}" target="_blank" rel="noopener" title="Open ${esc(s.speaker)}'s presenter folder in Google Drive" onclick="event.stopPropagation()">${esc(s.speaker)}</a>`:esc(s.speaker)}</b>${s.org?" · "+esc(s.org):""}</div>
     <span class="fmt">${esc(s.fmt)}</span><br>
+    <span class="cstat ${s.contract_sent?"on":""}" title="${s.contract_sent?"EE27 contract has been sent to this presenter":"Contract not sent yet — tracked on the Session Intake page"}">${s.contract_sent?"☑":"☐"} SENT</span>
+    <span class="cstat ${s.contract_signed?"on":""}" title="${s.contract_signed?"Presenter has signed — confirmed to speak":"Contract not received yet — tracked on the Session Intake page"}">${s.contract_signed?"☑":"☐"} SIGNED</span><br>
     <span class="signups ${COUNTS[s.key]?"":"zero"}" onclick="showSignups('${esc(s.key)}')" title="Click to see who signed up and export the list">👥 ${COUNTS[s.key]||0} signed up</span><br>
     <span class="acc-toggle" onclick="toggle('${esc(s.key)}')">Details</span>
     <div class="acc-body">

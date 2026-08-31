@@ -112,7 +112,7 @@ async function login(){
 }
 // ---------- main ----------
 async function loadExisting(){
-  const r=await fetch(SUPA_URL+"/rest/v1/ee27_sessions?select=key,title,speaker,sheet_sig,slot,day,source,folder,fmt,track,summary,takeaways,contract_signed,content_uploaded&order=title",{headers:H});
+  const r=await fetch(SUPA_URL+"/rest/v1/ee27_sessions?select=key,title,speaker,sheet_sig,slot,day,source,folder,fmt,track,summary,takeaways,contract_sent,contract_signed,content_uploaded,content_created&order=title",{headers:H});
   EXISTING=r.ok?await r.json():[];
 }
 function byKey(key){return EXISTING.find(s=>s.key===key)}
@@ -150,9 +150,9 @@ function render(){
     </div>
   </div>
   <div id="preview"></div>
-  <h3 class="sec">CURRENT DATABASE <span class="stamp">(${EXISTING.length} sessions · ${EXISTING.filter(s=>s.folder).length} with presenter folders · ${EXISTING.filter(s=>s.contract_signed).length} contracts signed · ${EXISTING.filter(s=>s.content_uploaded).length} content uploaded)</span></h3>
+  <h3 class="sec">CURRENT DATABASE <span class="stamp">(${EXISTING.length} sessions · ${EXISTING.filter(s=>s.folder).length} with folders · contracts: ${EXISTING.filter(s=>s.contract_sent).length} sent / ${EXISTING.filter(s=>s.contract_signed).length} signed · content: ${EXISTING.filter(s=>s.content_uploaded).length} uploaded / ${EXISTING.filter(s=>s.content_created).length} created)</span></h3>
   <div class="hint">Click a session title to see its summary and key takeaways. Track, Format, and the Contract/Content checkboxes save instantly when changed. Uploading a new CSV only ADDS new submissions — nothing you set here (track, format, folder, day, slot, checkboxes) is ever overwritten by an import.</div>
-  <div style="overflow-x:auto"><table class="rpt"><tr><th>SESSION</th><th>SPEAKER</th><th>TRACK</th><th>FORMAT</th><th>DAY</th><th>SLOT</th><th>PRESENTER FOLDER</th><th class="num" title="Presenter has signed their EE27 contract">CONTRACT<br>SIGNED</th><th class="num" title="Presenter has uploaded their digital content">CONTENT<br>UPLOADED</th></tr>
+  <div style="overflow-x:auto"><table class="rpt"><tr><th>SESSION</th><th>SPEAKER</th><th>TRACK</th><th>FORMAT</th><th>DAY</th><th>SLOT</th><th>PRESENTER FOLDER</th><th class="num" title="EE27 contract has been sent to the presenter">CONTRACT<br>SENT</th><th class="num" title="Presenter has signed their EE27 contract">CONTRACT<br>SIGNED</th><th class="num" title="Presenter has uploaded their digital content">CONTENT<br>UPLOADED</th><th class="num" title="Digital content has been created">CONTENT<br>CREATED</th></tr>
   ${EXISTING.map(dbRowHTML).join("")}
   </table></div>`;
   m.innerHTML=html;
@@ -182,11 +182,13 @@ function dbRowHTML(s){
       ?`<a href="${esc(s.folder)}" target="_blank" rel="noopener" style="color:#1B6E3C;font-weight:bold;font-size:.74rem">🔗 OPEN</a>
         <button class="btn ghost" style="padding:3px 8px;font-size:.6rem;margin-left:6px" onclick="editFolder('${esc(s.key)}')">✎ EDIT</button>`
       :`<button class="btn" style="padding:4px 9px;font-size:.6rem" onclick="editFolder('${esc(s.key)}')">＋ ADD LINK</button>`}</td>
+    <td class="num"><input type="checkbox" ${s.contract_sent?"checked":""} onchange="setCheck('${esc(s.key)}','contract_sent',this)" style="width:16px;height:16px;accent-color:#1B6E3C;cursor:pointer" title="Contract sent"></td>
     <td class="num"><input type="checkbox" ${s.contract_signed?"checked":""} onchange="setCheck('${esc(s.key)}','contract_signed',this)" style="width:16px;height:16px;accent-color:#1B6E3C;cursor:pointer" title="Contract signed"></td>
     <td class="num"><input type="checkbox" ${s.content_uploaded?"checked":""} onchange="setCheck('${esc(s.key)}','content_uploaded',this)" style="width:16px;height:16px;accent-color:#1B6E3C;cursor:pointer" title="Digital content uploaded"></td>
+    <td class="num"><input type="checkbox" ${s.content_created?"checked":""} onchange="setCheck('${esc(s.key)}','content_created',this)" style="width:16px;height:16px;accent-color:#1B6E3C;cursor:pointer" title="Digital content created"></td>
   </tr>`;
   if(OPEN_ROWS.has(s.key)){
-    h+=`<tr><td colspan="9" style="background:#F8FAFC;padding:12px 16px">
+    h+=`<tr><td colspan="11" style="background:#F8FAFC;padding:12px 16px">
       ${s.summary?`<div style="font-family:var(--font-heading);font-size:.68rem;color:var(--usat-red);letter-spacing:.5px;margin-bottom:4px">SUMMARY</div><p style="font-size:.8rem;line-height:1.5;margin-bottom:10px">${esc(s.summary)}</p>`:""}
       ${takeaways.length?`<div style="font-family:var(--font-heading);font-size:.68rem;color:var(--usat-red);letter-spacing:.5px;margin-bottom:4px">KEY TAKEAWAYS</div><ul style="font-size:.8rem;line-height:1.5;padding-left:18px">${takeaways.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}
       ${!s.summary&&!takeaways.length?`<span class="stamp">No summary or takeaways on file for this session.</span>`:""}
