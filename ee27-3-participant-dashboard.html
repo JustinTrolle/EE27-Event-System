@@ -337,7 +337,6 @@ function cardHTML(s,room,isKey){
     <div class="title" onclick="toggleCard('${esc(s.key)}')">${esc(s.title)}</div>
     <div class="speaker"><b>${esc(s.speaker)}</b>${s.org?" · "+esc(s.org):""}</div>
     <span class="fmt">${esc(s.fmt)}</span>
-    <div class="pop">${cnt?`👥 ${cnt} attendee${cnt===1?"":"s"} planning to attend`:""}</div>
     <span class="acc-toggle" onclick="toggleCard('${esc(s.key)}')">Details</span>
     <div class="acc-body">
       ${s.summary?`<h5>Summary</h5><p>${esc(s.summary)}</p>`:""}
