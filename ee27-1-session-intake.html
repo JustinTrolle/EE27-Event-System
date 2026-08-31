@@ -291,7 +291,7 @@ function buildPlan(){
   PLAN=PARSED.map(sub=>{
     const m=matchRow(sub);
     const sig=norm(sub.name)+"|"+norm(sub.title);
-    if(m)return {kind:m.sheet_sig===sig?"same":"match",sub,match:m,include:true};
+    if(m)return {kind:m.sheet_sig===sig?"same":"match",sub,match:m,include:false}; // recognized rows start unchecked
     return {kind:"new",sub,match:null,include:true};
   });
 }
@@ -300,9 +300,10 @@ function showPreview(){
   const nNew=PLAN.filter(p=>p.kind==="new").length;
   const nMatch=PLAN.filter(p=>p.kind!=="new").length;
   let h=`<div class="panel"><h3 class="sec" style="margin-top:0">IMPORT PREVIEW — ${nNew} new, ${nMatch} matched to existing sessions</h3>
+  <div class="hint">Only NEW submissions are pre-checked. Recognized sessions are unchecked — tick one only if you want to refresh its contact/bio info from the sheet.</div>
   <div style="overflow-x:auto"><table class="rpt"><tr><th></th><th>STATUS</th><th>SUBMITTED BY</th><th>PRESENTATION TITLE</th><th>MATCHES EXISTING SESSION</th></tr>`;
   PLAN.forEach((p,i)=>{
-    h+=`<tr><td><input type="checkbox" ${p.include?"checked":""} onchange="PLAN[${i}].include=this.checked"></td>
+    h+=`<tr><td><input type="checkbox" ${p.include?"checked":""} onchange="PLAN[${i}].include=this.checked;updateImportCount()"></td>
       <td>${p.kind==="new"?'<span class="chip new">NEW</span>':p.kind==="match"?'<span class="chip match">UPDATE</span>':'<span class="chip same">KNOWN</span>'}</td>
       <td><b>${esc(p.sub.name)}</b><div class="stamp">${esc(p.sub.email)}</div></td>
       <td>${esc(p.sub.title)}</td>
@@ -310,10 +311,14 @@ function showPreview(){
   });
   h+=`</table></div>
   <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
-    <button class="btn" onclick="runImport()">⬆ IMPORT ${PLAN.filter(p=>p.include).length} CHECKED ROWS</button>
+    <button class="btn" id="import-btn" onclick="runImport()">⬆ IMPORT ${PLAN.filter(p=>p.include).length} CHECKED ROWS</button>
     <span class="stamp" id="import-status"></span>
   </div></div>`;
   document.getElementById("preview").innerHTML=h;
+}
+function updateImportCount(){
+  const b=document.getElementById("import-btn");
+  if(b)b.textContent=`⬆ IMPORT ${PLAN.filter(p=>p.include).length} CHECKED ROWS`;
 }
 function splitTakeaways(t){
   const parts=(t||"").split(/\s*(?:\r?\n|[-•▪]\s+)\s*/).map(x=>x.trim()).filter(x=>x.length>2);
