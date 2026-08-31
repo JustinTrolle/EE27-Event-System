@@ -187,7 +187,7 @@ const SURVEY=[
  {id:"week",t:"single",q:"Do you prefer the conference to take place during the week or over the weekend?",opts:["During the week","Over the weekend","No preference"]},
  {id:"future",t:"single",q:"Do you plan to attend Endurance Exchange in future years? Please select the appropriate percentage.",opts:["100% - Yes, I will be there","80% - Extremely likely that I will be there","60% - Somewhat likely that I will be there","50% - On the fence about attending","25% - Unlikely that I will be there","0% - No, I will not be there"]}
 ];
-const ROLE_OPTS=["Coach","Race Director","Athlete","Club","Foundation Member","USA Triathlon Partner","Industry Specialist","Other"];
+const ROLE_OPTS=["Coach","Race Director","Athlete","Club","Foundation Member","USA Triathlon Partner","Industry Specialist","Presenter","USA Triathlon Staff","Other"];
 let SVSTATE=null; // {open, opens_at}
 let SVSAVED={};try{SVSAVED=JSON.parse(localStorage.getItem("ee27_eventsurvey")||"{}")}catch(e){}
 let ME=null;try{ME=JSON.parse(localStorage.getItem("ee27_attendee")||"null")}catch(e){}
@@ -204,7 +204,10 @@ function gateHTML(msg){
     <label>Email</label><input id="r-email" type="email" placeholder="you@example.com">
     <label>I am a… (choose all that apply)</label>
     <div style="text-align:left;background:#fff;border:1px solid var(--usat-gray-border);border-radius:3px;padding:8px 10px">
-      ${ROLE_OPTS.map(r=>`<label class="sv-opt" style="padding:3px 0"><input type="checkbox" name="r-role" value="${esc(r)}"> ${esc(r)}</label>`).join("")}
+      ${ROLE_OPTS.map(r=>`<label class="sv-opt" style="padding:3px 0"><input type="checkbox" name="r-role" value="${esc(r)}" ${r==="Other"?`onchange="document.getElementById('r-other-wrap').style.display=this.checked?'block':'none'"`:""}> ${esc(r)}</label>`).join("")}
+      <div id="r-other-wrap" style="display:none;padding:4px 0 2px 24px">
+        <input id="r-other" placeholder="Please tell us what best describes you" style="font-size:.85rem;padding:7px">
+      </div>
     </div>
     <div class="err">${esc(msg||"")}</div>
     <div style="text-align:center;margin-top:8px"><button class="btn" onclick="register()">START BUILDING MY SCHEDULE</button></div>
@@ -213,7 +216,9 @@ function gateHTML(msg){
 async function register(){
   const name=document.getElementById("r-name").value.trim();
   const email=document.getElementById("r-email").value.trim();
-  const roles=[...document.querySelectorAll('input[name="r-role"]:checked')].map(c=>c.value);
+  let roles=[...document.querySelectorAll('input[name="r-role"]:checked')].map(c=>c.value);
+  const otherTxt=(document.getElementById("r-other")||{value:""}).value.trim();
+  if(roles.includes("Other")&&otherTxt)roles=roles.map(r=>r==="Other"?"Other: "+otherTxt:r);
   if(!name){document.getElementById("main").innerHTML=gateHTML("Please enter your name.");return}
   if(!roles.length){document.getElementById("main").innerHTML=gateHTML("Please pick at least one role.");keepReg(name,email);return}
   // primary role keeps the coach/RD rollup on the tracking dashboard working
