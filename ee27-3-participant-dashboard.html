@@ -113,8 +113,41 @@ header .who a{color:#FFD3DD;cursor:pointer;text-decoration:underline}
 footer{background:var(--usat-blue-dark);color:rgba(255,255,255,.75);text-align:center;font-size:.72rem;padding:14px}
 .tab.print-tab{border-color:var(--usat-red);color:var(--usat-red)}
 .tab.print-tab:hover{background:var(--usat-red);color:#fff}
+/* ---------- TrainingPeaks × EE27 sponsor strip ---------- */
+.tpee-strip *{margin:0;padding:0;box-sizing:border-box}
+.tpee-strip{
+  --tp-blue:#3177FF;--tp-navy:#010F31;
+  position:relative;max-width:1200px;margin:0 auto 16px;background:#fff;
+  border:1px solid var(--usat-gray-border);border-radius:6px;overflow:hidden;
+  font-family:Arial,Helvetica,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.10);
+}
+.tpee-strip-inner{display:flex;align-items:center;gap:20px;padding:10px 20px 10px 16px;min-height:64px}
+.tpee-strip-peaks{display:flex;align-items:flex-end;gap:4px;flex:0 0 auto}
+.tpee-strip-peaks span{display:block;width:8px;background:var(--tp-blue);transform:skewX(-18deg);border-radius:2px;animation:tpee-strip-rise 2.8s ease-in-out infinite}
+.tpee-strip-peaks span:nth-child(1){height:14px;animation-delay:0s}
+.tpee-strip-peaks span:nth-child(2){height:22px;animation-delay:.25s}
+.tpee-strip-peaks span:nth-child(3){height:30px;animation-delay:.5s}
+@keyframes tpee-strip-rise{0%,100%{transform:skewX(-18deg) scaleY(1)}50%{transform:skewX(-18deg) scaleY(1.25)}}
+.tpee-strip-text{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px}
+.tpee-strip-headline{font-family:"Arial Black",Impact,sans-serif;color:var(--usat-blue);font-size:1rem;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap}
+.tpee-strip-headline em{font-style:normal;color:var(--tp-blue)}
+.tpee-strip-logo{flex:0 0 auto;display:block}
+.tpee-strip-logo img{display:block;height:40px;width:auto}
+.tpee-strip-cta{flex:0 0 auto;display:inline-block;background:var(--tp-blue);color:#fff;font-family:"Arial Black",Impact,sans-serif;font-size:.72rem;letter-spacing:1.2px;text-transform:uppercase;text-decoration:none;padding:9px 16px;border-radius:4px;white-space:nowrap;transition:background .2s ease,transform .2s ease}
+.tpee-strip-cta:hover{background:#1F5CD6;transform:translateY(-1px)}
+.tpee-strip-accent{position:relative;height:4px;background:var(--usat-blue);overflow:hidden}
+.tpee-strip-accent::after{content:"";position:absolute;top:0;left:-25%;width:25%;height:100%;background:var(--tp-blue);animation:tpee-strip-track 4s linear infinite}
+@keyframes tpee-strip-track{0%{left:-25%}100%{left:125%}}
+@media(max-width:700px){
+  .tpee-strip-inner{flex-wrap:wrap;justify-content:center;text-align:center;padding:12px 16px;gap:10px 16px}
+  .tpee-strip-text{justify-content:center}
+  .tpee-strip-headline{white-space:normal;font-size:.9rem}
+}
+@media(prefers-reduced-motion:reduce){
+  .tpee-strip-peaks span,.tpee-strip-accent::after{animation:none}
+}
 @media print{
-  .tabs,.note,.actions,.fbform,.acc-toggle,.toast,footer,header .who,.pop,.bottom-jump{display:none !important}
+  .tabs,.note,.actions,.fbform,.acc-toggle,.toast,footer,header .who,.pop,.bottom-jump,.tpee-strip{display:none !important}
   header{padding:10px 16px}
   header .logo{height:40px}
   body{font-size:12px}
@@ -505,6 +538,7 @@ function render(){
   </div>`;
   let h=tabsHTML("top");
   h+=TAB==="survey"?"":`<div class="note">Tap a session title for the full summary and takeaways. “Add to my schedule” tells us what you're interested in; “Check in” records that you attended; feedback goes straight to the education team.</div>`;
+  if(TAB!=="survey")h+=TPEE_BANNER;
   h+=TAB==="survey"?surveyHTML():TAB==="my"?myHTML():dayHTML(TAB);
   h+=`<div class="bottom-jump" style="border-top:1px solid var(--usat-gray-border);margin-top:22px;padding-top:14px">
     <div style="font-size:.7rem;font-weight:bold;letter-spacing:.5px;color:var(--usat-gray-mid);text-transform:uppercase;margin-bottom:8px">Jump to another day</div>
@@ -512,6 +546,19 @@ function render(){
   m.innerHTML=h;
   restoreForms(snap);
 }
+const TPEE_BANNER=`<div class="tpee-strip">
+  <div class="tpee-strip-inner">
+    <div class="tpee-strip-peaks" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div class="tpee-strip-text">
+      <span class="tpee-strip-headline">Plan smarter. Coach <em>stronger.</em></span>
+    </div>
+    <span class="tpee-strip-logo">
+      <img src="https://raw.githubusercontent.com/JustinTrolle/USAT-Images/a7a32d0fe98163084e00b82285b0711bdf6fe06b/Training%20Peask%20Logo.png" alt="TrainingPeaks logo" width="229" height="86">
+    </span>
+    <a class="tpee-strip-cta" href="https://www.trainingpeaks.com" target="_blank" rel="noopener">Explore TrainingPeaks &rarr;</a>
+  </div>
+  <div class="tpee-strip-accent" aria-hidden="true"></div>
+</div>`;
 function goTab(t,where){
   TAB=t;render();
   if(where==="bottom")window.scrollTo({top:0,behavior:"instant"});
