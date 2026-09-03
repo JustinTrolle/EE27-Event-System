@@ -210,7 +210,9 @@ async function setCheck(key,field,el){
   const s=byKey(key);if(!s)return;
   const val=el.checked;
   const old=s[field];s[field]=val;
-  if(!await saveSession(key,{[field]:val})){s[field]=old;el.checked=old;}
+  const patch={[field]:val};
+  if(field==="contract_sent")patch.contract_sent_via=val?"intake":""; // green on the builder
+  if(!await saveSession(key,patch)){s[field]=old;el.checked=old;}
   render(); // refresh the header counts
 }
 async function editFolder(key){
