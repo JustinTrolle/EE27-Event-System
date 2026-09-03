@@ -209,10 +209,16 @@ async function setField(key,field,val){
 async function setCheck(key,field,el){
   const s=byKey(key);if(!s)return;
   const val=el.checked;
-  const old=s[field];s[field]=val;
+  const old=s[field];
   const patch={[field]:val};
   if(field==="contract_sent")patch.contract_sent_via=val?"intake":""; // green on the builder
+  if(field==="not_selected"&&val&&s.slot){
+    if(!confirm(`"${s.title}" is scheduled in slot ${s.slot.toUpperCase()}. Marking it NOT SELECTED removes it from the schedule and hides it from the Schedule Builder. Continue?`)){el.checked=old;return}
+    patch.slot="";patch.status="proposed";
+  }
+  s[field]=val;
   if(!await saveSession(key,patch)){s[field]=old;el.checked=old;}
+  else if(patch.slot==="")s.slot=null;
   render(); // refresh the header counts
 }
 async function editFolder(key){

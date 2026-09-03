@@ -251,7 +251,7 @@ async function saveSession(key, patch){
   }catch(e){ setSyncStatus("Offline — change not saved", false); }
   saving = false;
 }
-function findSession(slot){ return SESSIONS.find(s=>s.slot===slot); }
+function findSession(slot){ return SESSIONS.find(s=>s.slot===slot && !s.not_selected); }
 function byKey(key){ return SESSIONS.find(s=>s.key===key); }
 // ---------- cards ----------
 function cardHTML(s, showSlot){
@@ -413,9 +413,19 @@ async function toggleSent(key){
 }
 async function toggleNotSelected(key){
   const s = byKey(key); if(!s) return;
-  s.not_selected = !s.not_selected;
-  build();
-  await saveSession(key, {not_selected: s.not_selected});
+  if(!s.not_selected){
+    const slotNote = s.slot ? ` It will be removed from slot ${s.slot.toUpperCase()} and` : " It";
+    if(!confirm(`Mark "${s.title}" as NOT SELECTED?\n\n${slotNote.trim()} will disappear from the Schedule Builder — you can still see it (and unmark it) on the Session Intake page.`)) return;
+    const patch = {not_selected:true};
+    if(s.slot){ patch.slot=""; patch.status="proposed"; s.slot=null; }
+    s.not_selected = true;
+    build();
+    await saveSession(key, patch);
+  } else {
+    s.not_selected = false;
+    build();
+    await saveSession(key, {not_selected:false});
+  }
 }
 // ---------- build ----------
 function build(openKeys){
@@ -451,7 +461,7 @@ function build(openKeys){
       html += `</tr>`;
     }
     html += `</table></div>`;
-    const pool = SESSIONS.filter(s=>String(s.day)===dayNum && !s.slot);
+    const pool = SESSIONS.filter(s=>String(s.day)===dayNum && !s.slot && !s.not_selected);
     if(pool.length){
       html += `<div class="pool"><h3>Unassigned — ${esc(meta.date)}<span class="count-pill">${pool.length}</span></h3>
       <div class="hint">Submissions proposed for this day, awaiting a slot. Use the DAY and SLOT selectors on each card.</div>
@@ -459,7 +469,7 @@ function build(openKeys){
     }
     html += `</div>`;
   }
-  const tbd = SESSIONS.filter(s=>!s.slot && (s.day==="tbd" || !s.day));
+  const tbd = SESSIONS.filter(s=>!s.slot && (s.day==="tbd" || !s.day) && !s.not_selected);
   if(tbd.length){
     html += `<div class="day-block"><div class="day-header"><h2>NEEDS A DELIBERATE HOME</h2><div class="theme">New or unthemed submissions — assign a day to move them into a day pool</div></div>
     <div class="pool"><div class="pool-grid">${tbd.map(s=>cardHTML(s, false)).join("")}</div></div></div>`;
@@ -467,7 +477,8 @@ function build(openKeys){
   document.getElementById("app").innerHTML = html;
   openKeys.forEach(k=>{ const el=document.querySelector(`.card[data-key="${CSS.escape(k)}"]`); if(el) el.classList.add("open"); });
   const n = SESSIONS.filter(s=>s.slot).length;
-  document.getElementById("assign-count").textContent = n + " of 62 slots assigned (56 sessions + 6 keynotes)  •  " + (SESSIONS.length-n) + " of " + SESSIONS.length + " sessions unassigned  •  shared live with everyone viewing this page";
+  const nHidden = SESSIONS.filter(s=>s.not_selected).length;
+  document.getElementById("assign-count").textContent = n + " of 62 slots assigned (56 sessions + 6 keynotes)  •  " + (SESSIONS.length-n-nHidden) + " sessions unassigned" + (nHidden?"  •  "+nHidden+" not selected (hidden here — manage on Session Intake)":"") + "  •  shared live with everyone viewing this page";
 }
 // ---------- signup roster ----------
 let ADMIN_CACHE = null, ADMIN_CACHE_AT = 0;
