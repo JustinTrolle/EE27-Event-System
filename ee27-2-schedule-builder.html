@@ -78,6 +78,8 @@ td.keynote .folder-btn{background:rgba(255,255,255,.18)}
 .cstat.no{color:#fff;background:var(--usat-red);border-color:var(--usat-red)}
 .cstat.onb{color:#fff;background:var(--usat-blue);border-color:var(--usat-blue)}
 td.keynote .cstat.onb{background:#3177FF;color:#fff;border-color:#3177FF}
+.cstat.lock{color:#fff;background:var(--usat-blue-dark);border-color:var(--usat-blue-dark)}
+td.keynote .cstat.lock{background:#fff;color:var(--usat-blue-dark);border-color:#fff}
 .cstat.click{cursor:pointer}
 .cstat.click:hover{border-color:var(--usat-red);color:var(--usat-red)}
 .cstat.click.no:hover{background:#8a0a2b;color:#fff}
@@ -226,7 +228,7 @@ let COUNTS = {};
 async function loadSessions(){
   try{
     const [r, rs] = await Promise.all([
-      fetch(SUPA_URL+"/rest/v1/ee27_sessions?select=key,title,speaker,org,fmt,track,day,slot,summary,takeaways,notes,folder,status,not_selected,contract_sent,contract_sent_via,contract_signed&order=title",{headers:H}),
+      fetch(SUPA_URL+"/rest/v1/ee27_sessions?select=key,title,speaker,org,fmt,track,day,slot,summary,takeaways,notes,folder,status,not_selected,contract_sent,contract_sent_via,contract_signed,locked_in&order=title",{headers:H}),
       fetch(SUPA_URL+"/rest/v1/ee27_selections?select=session_key,selected",{headers:H})
     ]);
     if(!r.ok){ setSyncStatus("Sync error — could not load sessions", false); return; }
@@ -263,7 +265,8 @@ function cardHTML(s, showSlot){
     <span class="fmt">${esc(s.fmt)}</span><br>
     <span class="cstat click ${s.not_selected?"no":""}" onclick="toggleNotSelected('${esc(s.key)}')" title="${s.not_selected?"Reviewed but not chosen — click to unmark":"Click to mark as reviewed but not chosen"}">${s.not_selected?"☑":"☐"} NOT SELECTED</span>
     <span class="cstat click ${s.contract_sent?(s.contract_sent_via==="builder"?"onb":"on"):""}" onclick="toggleSent('${esc(s.key)}')" title="${s.contract_sent?(s.contract_sent_via==="builder"?"Contract marked sent from the Schedule Builder — click to unmark":"Contract marked sent from the Session Intake page — click to unmark"):"Click to mark the EE27 contract as sent"}">${s.contract_sent?"☑":"☐"} SENT</span>
-    <span class="cstat ${s.contract_signed?"on":""}" title="${s.contract_signed?"Presenter has signed — confirmed to speak":"Contract not received yet — tracked on the Session Intake page"}">${s.contract_signed?"☑":"☐"} SIGNED</span><br>
+    <span class="cstat ${s.contract_signed?"on":""}" title="${s.contract_signed?"Presenter has signed — confirmed to speak":"Contract not received yet — tracked on the Session Intake page"}">${s.contract_signed?"☑":"☐"} SIGNED</span>
+    <span class="cstat click ${s.locked_in?"lock":""}" onclick="toggleLocked('${esc(s.key)}')" title="${s.locked_in?"This session is locked in place — click to unlock":"Click to lock this session in place so you know it should not move"}">${s.locked_in?"🔒 LOCKED":"☐ LOCK"}</span><br>
     <span class="signups ${COUNTS[s.key]?"":"zero"}" onclick="showSignups('${esc(s.key)}')" title="Click to see who signed up and export the list">👥 ${COUNTS[s.key]||0} signed up</span><br>
     <span class="acc-toggle" onclick="toggle('${esc(s.key)}')">Details</span>
     <div class="acc-body">
@@ -327,10 +330,16 @@ function letOptions(s){
   return o;
 }
 async function assignSlot(s, slot){
+  if(s.locked_in && s.slot && s.slot!==slot){
+    if(!confirm(`"${s.title}" is 🔒 LOCKED in slot ${s.slot.toUpperCase()}. Move it anyway?`)){
+      delete pending[s.key]; build(); return;
+    }
+  }
   const other = SESSIONS.find(x=>x.slot===slot && x.key!==s.key);
   if(other){
     const lab = slot[0]==="k" ? `${slot.toUpperCase()} (${KEYNOTES[parseInt(slot.slice(1))-1]||""})` : `Slot ${slot.toUpperCase()}`;
-    if(!confirm(`${lab} is already assigned to "${other.title}". Replace it? (It will move back to the unassigned pool.)`)){
+    const lockWarn = other.locked_in ? "\n\n⚠ WARNING: that session is 🔒 LOCKED in place!" : "";
+    if(!confirm(`${lab} is already assigned to "${other.title}". Replace it? (It will move back to the unassigned pool.)${lockWarn}`)){
       delete pending[s.key]; build(); return;
     }
     other.slot = null;
@@ -372,8 +381,15 @@ function cancelPending(key){
   delete pending[key];
   build();
 }
+async function toggleLocked(key){
+  const s = byKey(key); if(!s) return;
+  s.locked_in = !s.locked_in;
+  build();
+  await saveSession(key, {locked_in: s.locked_in});
+}
 async function unassign(key){
   const s = byKey(key); if(!s) return;
+  if(s.locked_in && !confirm(`"${s.title}" is 🔒 LOCKED in place. Remove it from its slot anyway?`)) return;
   s.slot = null; delete pending[key];
   build();
   await saveSession(key, {slot:"", status:"proposed"});
