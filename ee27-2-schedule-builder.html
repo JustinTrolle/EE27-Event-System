@@ -275,14 +275,9 @@ function cardHTML(s, showSlot){
     </div>
     <div class="card-foot">
       ${s.slot?`<button class="rm-btn" onclick="unassign('${esc(s.key)}')" title="Remove from this slot">✕ REMOVE</button>`:""}
+      ${pendingControls(s)}
       <label>DAY</label>
-      <select class="slot-sel" onchange="setDay('${esc(s.key)}',this.value)">
-        <option value="" ${!s.day?"selected":""}>–</option>
-        <option value="1" ${s.day==="1"?"selected":""}>1</option>
-        <option value="2" ${s.day==="2"?"selected":""}>2</option>
-        <option value="3" ${s.day==="3"?"selected":""}>3</option>
-        <option value="tbd" ${s.day==="tbd"?"selected":""}>TBD</option>
-      </select>
+      <select class="slot-sel" onchange="pick('${esc(s.key)}','day',this.value)">${dayOptions(s)}</select>
       <label>SLOT</label>
       <select class="slot-sel" onchange="pick('${esc(s.key)}','num',this.value)">${numOptions(s)}</select>
       <select class="slot-sel" onchange="pick('${esc(s.key)}','let',this.value)">${letOptions(s)}</select>
@@ -290,9 +285,33 @@ function cardHTML(s, showSlot){
   </div>`;
 }
 function toggle(key){ const el=document.querySelector(`.card[data-key="${CSS.escape(key)}"]`); if(el) el.classList.toggle("open"); }
+// Selections are held in `pending` and only applied once the pick is complete,
+// so cards don't jump around mid-selection.
 const pending = {};
+// each slot number/keynote implies a day in the grid
+const SLOTDAY = {};
+{ let kk=0; for(const d of ["1","2","3"]) for(const r of DAY_META[d].rows){
+    if(r[1]==="sess") SLOTDAY[String(r[2])]=d;
+    else if(r[1]==="key"){ kk++; SLOTDAY["k"+kk]=d; }
+} }
+function slotTouched(p){ return p && ("num" in p || "let" in p); }
+function pendingControls(s){
+  const p = pending[s.key];
+  if(!p) return "";
+  const dayOnly = p.day!==undefined && !slotTouched(p);
+  return `${dayOnly?`<button class="rm-btn" style="color:#1B6E3C;border-color:#1B6E3C;margin-right:0" onclick="applyDay('${esc(s.key)}')" title="Move this session to the selected day's pool">✓ APPLY DAY</button>`:""}
+    <button class="rm-btn" style="margin-right:0" onclick="cancelPending('${esc(s.key)}')" title="Discard this in-progress selection">✕ CANCEL</button>
+    ${!dayOnly?`<span style="font-size:.6rem;color:var(--usat-gray-mid)">moves when # + letter are both picked</span>`:""}`;
+}
+function dayOptions(s){
+  const p = pending[s.key];
+  const cur = (p && p.day!==undefined) ? p.day : (s.day||"");
+  return `<option value="" ${cur===""?"selected":""}>–</option>`+
+    ["1","2","3","tbd"].map(d=>`<option value="${d}" ${cur===d?"selected":""}>${d==="tbd"?"TBD":d}</option>`).join("");
+}
 function numOptions(s){
-  const cur = s.slot ? (s.slot[0]==="k" ? s.slot : String(parseInt(s.slot))) : (pending[s.key]&&pending[s.key].num)||"";
+  const p = pending[s.key];
+  const cur = slotTouched(p) ? (p.num||"") : (s.slot ? (s.slot[0]==="k" ? s.slot : String(parseInt(s.slot))) : "");
   let o = `<option value="">#</option>`;
   for(let n=1;n<=14;n++) o += `<option value="${n}" ${String(cur)===String(n)?"selected":""}>${n}</option>`;
   KEYNOTES.forEach((lab,i)=>{ const id="k"+(i+1);
@@ -300,8 +319,9 @@ function numOptions(s){
   return o;
 }
 function letOptions(s){
-  const isKey = (s.slot && s.slot[0]==="k") || (pending[s.key] && pending[s.key].num && pending[s.key].num[0]==="k");
-  const cur = (s.slot && s.slot[0]!=="k") ? s.slot.replace(/\d+/,"") : (pending[s.key]&&pending[s.key].let)||"";
+  const p = pending[s.key];
+  const isKey = (!slotTouched(p) && s.slot && s.slot[0]==="k") || (slotTouched(p) && p.num && p.num[0]==="k");
+  const cur = slotTouched(p) ? (p.let||"") : ((s.slot && s.slot[0]!=="k") ? s.slot.replace(/\d+/,"") : "");
   let o = `<option value="">–</option>`;
   for(const L of LETTERS) o += `<option value="${L}" ${(!isKey&&cur===L)?"selected":""}>${L}</option>`;
   return o;
@@ -316,20 +336,41 @@ async function assignSlot(s, slot){
     other.slot = null;
     await saveSession(other.key, {slot:"", status:"proposed"});
   }
-  s.slot = slot;
+  const day = SLOTDAY[slot[0]==="k" ? slot : String(parseInt(slot))] || s.day;
+  s.slot = slot; s.day = day;
   delete pending[s.key];
   build();
-  await saveSession(s.key, {slot:slot, status:"scheduled"});
+  await saveSession(s.key, {slot:slot, day:day, status:"scheduled"});
 }
 async function pick(key, part, val){
   const s = byKey(key); if(!s) return;
-  if(part==="num" && val && val[0]==="k"){ await assignSlot(s, val); return; }
-  if(!pending[key]) pending[key] = (s.slot && s.slot[0]!=="k") ? {num:String(parseInt(s.slot)), let:s.slot.replace(/\d+/,"")} : {num:"",let:""};
-  pending[key][part==="num"?"num":"let"] = val;
+  if(!pending[key]) pending[key] = {};
   const p = pending[key];
-  if(p.num && p.let){ await assignSlot(s, p.num+p.let); }
-  else if(!p.num && !p.let){ s.slot=null; delete pending[key]; build(); await saveSession(key,{slot:"",status:"proposed"}); }
-  else { build(); } // partial — wait for both
+  if(part==="day"){ p.day = val; build(); return; }
+  // keynote slots have no letter — a K pick completes the selection on its own
+  if(part==="num" && val && val[0]==="k"){ await assignSlot(s, val); return; }
+  p[part==="num"?"num":"let"] = val;
+  if(p.num && p.let){ await assignSlot(s, p.num+p.let); return; }
+  if(("num" in p) && ("let" in p) && !p.num && !p.let && s.slot){
+    // both slot boxes explicitly cleared — unassign
+    s.slot = null; delete pending[key];
+    build();
+    await saveSession(key, {slot:"", status:"proposed"});
+    return;
+  }
+  build(); // partial — hold position until the selection is complete
+}
+async function applyDay(key){
+  const s = byKey(key); if(!s) return;
+  const p = pending[key]; if(!p || p.day===undefined) return;
+  s.day = p.day || null;
+  delete pending[key];
+  build();
+  await saveSession(key, {day: p.day});
+}
+function cancelPending(key){
+  delete pending[key];
+  build();
 }
 async function unassign(key){
   const s = byKey(key); if(!s) return;
@@ -359,12 +400,6 @@ async function toggleNotSelected(key){
   s.not_selected = !s.not_selected;
   build();
   await saveSession(key, {not_selected: s.not_selected});
-}
-async function setDay(key, val){
-  const s = byKey(key); if(!s) return;
-  s.day = val || null;
-  build();
-  await saveSession(key, {day:val});
 }
 // ---------- build ----------
 function build(openKeys){
